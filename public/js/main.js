@@ -124,13 +124,15 @@ function leaveRoom() {
 
 // ------------------------------------------------------------------ board
 
-function buildPipIcon(n) {
+const PIP_ON = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+
+function buildPipGrid(n, extraClass) {
   const wrap = document.createElement('div');
-  wrap.className = 'pip-mini';
-  const on = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] }[n];
+  wrap.className = 'pip-mini' + (extraClass ? ' ' + extraClass : '');
+  const on = PIP_ON[n] || [];
   for (let i = 1; i <= 9; i++) {
     const s = document.createElement('span');
-    if (on.includes(i)) s.style.opacity = '1';
+    s.className = 'pip' + (on.includes(i) ? ' on' : '');
     wrap.appendChild(s);
   }
   return wrap;
@@ -158,7 +160,7 @@ function buildBoard() {
 
     const minorIcon = document.createElement('div');
     minorIcon.className = 'cat-icon';
-    minorIcon.appendChild(buildPipIcon(MINOR[i].pips));
+    minorIcon.appendChild(buildPipGrid(MINOR[i].pips));
     row.appendChild(minorIcon);
     row.appendChild(makeScoreCell(MINOR[i].key, 0));
     row.appendChild(makeScoreCell(MINOR[i].key, 1));
@@ -275,22 +277,32 @@ function renderState(msg) {
   $('bonusCell1').textContent = `${Math.min(upperSumOf(players[1]), UPPER_BONUS_THRESHOLD)}/${UPPER_BONUS_THRESHOLD}`;
 
   const me = players[myIndex];
-  const animate = !!(prevState && prevState.players[myIndex]);
+  // A roll actually happened iff rollsLeft just went down (per-die value
+  // comparison is wrong: a die that happens to re-land on its old value
+  // would silently skip its spin animation).
+  const justRolled = !!(prevState && prevState.players[myIndex] && prevState.players[myIndex].rollsLeft > me.rollsLeft);
   me.dice.forEach((v, i) => {
-    diceApi[i].setValue(v, { animate: animate && prevState.players[myIndex].dice[i] !== v && !me.held[i] });
+    diceApi[i].setValue(v, { animate: justRolled && !me.held[i] });
     diceApi[i].setHeld(me.held[i]);
   });
 
-  // opponent mini dice strip
+  // opponent dice strip (bigger heart-pip tiles, mirrors held state live)
   const oppIdx = myIndex === 0 ? 1 : 0;
   const opp = players[oppIdx];
   const mini = $('oppMiniDice');
-  mini.innerHTML = '';
+  if (mini.childElementCount !== 5) {
+    mini.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+      const d = document.createElement('div');
+      d.className = 'mini-die';
+      d.appendChild(buildPipGrid(1, 'mini-die-pips'));
+      mini.appendChild(d);
+    }
+  }
   opp.dice.forEach((v, i) => {
-    const d = document.createElement('div');
-    d.className = 'mini-die' + (opp.held[i] ? ' held' : '');
-    d.textContent = v;
-    mini.appendChild(d);
+    const tile = mini.children[i];
+    tile.classList.toggle('held', !!opp.held[i]);
+    tile.replaceChild(buildPipGrid(v, 'mini-die-pips'), tile.firstChild);
   });
   $('oppRolls').textContent = opp.connected ? `굴리기 ${opp.rollsLeft}회 남음` : '연결 끊김';
 
@@ -326,10 +338,25 @@ function renderState(msg) {
   } else if (status === 'playing') {
     showScreen('game');
   } else if (status === 'finished') {
+    const myName = players[myIndex].name;
     const myTotal = players[myIndex].total;
     const oppTotal = players[oppIdx].total;
-    $('resultTitle').textContent = myTotal === oppTotal ? '무승부!' : (myTotal > oppTotal ? '승리! 🎉' : '아쉽네요 😢');
-    $('resultDetail').textContent = `나: ${myTotal}점 · ${opp.name}: ${oppTotal}점`;
+    const diff = Math.abs(myTotal - oppTotal);
+    const card = $('resultCard');
+    card.classList.remove('win', 'lose', 'draw');
+    if (myTotal === oppTotal) {
+      card.classList.add('draw');
+      $('resultTitle').textContent = `💗 운명의 무승부! 💗`;
+      $('resultDetail').textContent = `${myName}님과 ${opp.name}님, 한 치도 물러서지 않고 나란히 ${myTotal}점! 서로가 서로의 라이벌입니다.`;
+    } else if (myTotal > oppTotal) {
+      card.classList.add('win');
+      $('resultTitle').innerHTML = `👑 ${myName}의 압승! 👑`;
+      $('resultDetail').textContent = `${myName}님이 ${opp.name}님을 무려 ${diff}점 차이로 완전히 무너뜨렸습니다! (${myTotal} : ${oppTotal}) 전설의 승리입니다! 🎉🎉🎉`;
+    } else {
+      card.classList.add('lose');
+      $('resultTitle').innerHTML = `💔 ${opp.name}에게 참패 💔`;
+      $('resultDetail').textContent = `${myName}님, ${opp.name}님에게 ${diff}점 차이로 처참하게 무너졌습니다... (${myTotal} : ${oppTotal}) 하지만 다음엔 반드시 설욕할 수 있어요!`;
+    }
     showScreen('result');
     sessionStorage.removeItem('yatzy_session');
   }

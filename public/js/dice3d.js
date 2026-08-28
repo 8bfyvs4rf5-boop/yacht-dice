@@ -12,8 +12,11 @@ const FACE_DEFS = [
 ];
 
 // Rotation (deg) that brings each value's face to the front, derived from
-// the placements above.
-const SHOW_ROTATION = {
+// the placements above. A small constant tilt is baked in so the cube never
+// sits perfectly flat-on — it always reads as a 3D object with a visible
+// top/side edge, even at rest.
+const TILT = { x: -16, y: 20 };
+const BASE_ROTATION = {
   1: { x: 0, y: 0 },
   2: { x: 90, y: 0 },
   3: { x: 0, y: -90 },
@@ -21,6 +24,9 @@ const SHOW_ROTATION = {
   5: { x: -90, y: 0 },
   6: { x: 0, y: 180 },
 };
+const SHOW_ROTATION = Object.fromEntries(
+  Object.entries(BASE_ROTATION).map(([k, v]) => [k, { x: v.x + TILT.x, y: v.y + TILT.y }])
+);
 
 const PIP_LAYOUT = {
   1: [5],
