@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>요트다이스</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <section id="lobby" class="screen">
+    <div class="lobby-card">
+      <h1>🎲 요트다이스</h1>
+      <p class="sub">친구와 실시간으로 대결하세요</p>
+      <label for="nameInput">닉네임</label>
+      <input id="nameInput" maxlength="10" placeholder="닉네임 입력" autocomplete="off">
+
+      <button id="createBtn" class="primary-btn">방 만들기</button>
+
+      <div class="divider"><span>또는</span></div>
+
+      <div class="join-row">
+        <input id="codeInput" maxlength="6" placeholder="초대 코드 입력" autocomplete="off">
+        <button id="joinBtn" class="primary-btn ghost">참가하기</button>
+      </div>
+      <p id="lobbyMsg" class="lobby-msg"></p>
+    </div>
+  </section>
+
+  <section id="waiting" class="screen hidden">
+    <div class="lobby-card">
+      <p class="sub">상대방을 기다리는 중…</p>
+      <div class="room-code-display" id="roomCodeDisplay">----</div>
+      <p class="hint">이 코드를 상대방에게 공유하세요</p>
+      <button id="cancelWaitBtn" class="primary-btn ghost">취소</button>
+    </div>
+  </section>
+
+  <section id="game" class="screen hidden">
+    <header class="topbar">
+      <button class="icon-btn" id="backBtn" title="로비로">‹</button>
+      <button class="icon-btn" id="menuBtn" title="새로고침">≡</button>
+      <div class="vs-panel">
+        <div class="player-chip me">
+          <span class="avatar">🙂</span>
+          <span class="pname" id="p0Name">-</span>
+          <span class="pscore" id="p0Score">0</span>
+        </div>
+        <span class="vs">VS</span>
+        <div class="player-chip opp">
+          <span class="pscore" id="p1Score">0</span>
+          <span class="pname" id="p1Name">-</span>
+          <span class="avatar">🙂</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="opp-strip" id="oppStrip">
+      <span class="opp-strip-label">상대 주사위</span>
+      <div class="opp-mini-dice" id="oppMiniDice"></div>
+      <span class="opp-rolls" id="oppRolls"></span>
+    </div>
+
+    <div class="board">
+      <div class="board-head">
+        <div class="col-icon"></div>
+        <div class="col-label" colspan="2">Minor</div>
+        <div class="col-icon"></div>
+        <div class="col-label" colspan="2">Major</div>
+      </div>
+      <div class="board-rows" id="boardRows"></div>
+    </div>
+
+    <div class="dice-row" id="diceRow"></div>
+
+    <button id="rollBtn" class="roll-btn">
+      <span>ROLL</span>
+      <span class="roll-count" id="rollCount">3</span>
+    </button>
+    <p id="turnMsg" class="turn-msg"></p>
+  </section>
+
+  <section id="result" class="screen hidden">
+    <div class="lobby-card">
+      <h2 id="resultTitle">게임 종료</h2>
+      <p id="resultDetail"></p>
+      <button id="restartBtn" class="primary-btn">로비로 돌아가기</button>
+    </div>
+  </section>
+
+  <div id="toastHost"></div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
