@@ -31,6 +31,7 @@ export class GameRoom {
     if (!this.game) {
       this.game = (await this.state.storage.get('game')) || { code: null, players: [], turn: 0 };
       if (this.game.turn == null) this.game.turn = 0;
+      if (!this.game.chat) this.game.chat = [];
     }
     return this.game;
   }
@@ -148,6 +149,11 @@ export class GameRoom {
       player.rollsLeft = 3;
       player.rolled = false;
       game.turn = 1 - game.turn;
+    } else if (msg.type === 'chat') {
+      const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, 200) : '';
+      if (!text) return;
+      game.chat.push({ idx: session.index, name: player.name, text, ts: Date.now() });
+      if (game.chat.length > 100) game.chat = game.chat.slice(-100);
     } else {
       return;
     }
@@ -173,7 +179,7 @@ export class GameRoom {
         ...summary,
       };
     });
-    const payload = JSON.stringify({ type: 'state', room: game.code, status, turn: game.turn, players });
+    const payload = JSON.stringify({ type: 'state', room: game.code, status, turn: game.turn, chat: game.chat, players });
     for (const ws of this.sessions.keys()) {
       try { ws.send(payload); } catch { /* dead socket, will be cleaned up on close */ }
     }

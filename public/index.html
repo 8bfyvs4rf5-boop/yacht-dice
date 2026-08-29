@@ -40,7 +40,7 @@
   <section id="game" class="screen hidden">
     <header class="topbar">
       <button class="icon-btn" id="backBtn" title="로비로">‹</button>
-      <button class="icon-btn" id="menuBtn" title="새로고침">≡</button>
+      <button class="icon-btn" id="menuBtn" title="규칙">≡</button>
       <div class="vs-panel">
         <div class="player-chip me" id="p0Chip">
           <span class="avatar">🙂</span>
@@ -54,6 +54,10 @@
           <span class="avatar">🙂</span>
         </div>
       </div>
+      <button class="icon-btn" id="chatBtn" title="채팅">
+        💬
+        <span class="chat-badge hidden" id="chatBadge">0</span>
+      </button>
     </header>
 
     <div class="board">
@@ -85,6 +89,7 @@
 
   <section id="result" class="screen hidden">
     <div class="lobby-card result-card" id="resultCard">
+      <div class="heart-rain" id="heartRain"></div>
       <h2 id="resultTitle">게임 종료</h2>
       <p id="resultDetail"></p>
       <button id="restartBtn" class="primary-btn">로비로 돌아가기</button>
@@ -92,6 +97,24 @@
   </section>
 
   <div id="toastHost"></div>
+
+  <div class="yacht-fx" id="yachtFx">
+    <div class="yacht-boat">⛵</div>
+    <div class="yacht-caption" id="yachtCaption"></div>
+  </div>
+
+  <div class="chat-backdrop" id="chatBackdrop"></div>
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-header">
+      <span>💬 채팅</span>
+      <button class="icon-btn" id="chatCloseBtn" title="닫기">×</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <form class="chat-form" id="chatForm">
+      <input id="chatInput" maxlength="200" placeholder="메시지 입력…" autocomplete="off">
+      <button type="submit" class="chat-send-btn">전송</button>
+    </form>
+  </div>
 </div>
 
 <script type="module" src="js/main.js"></script>

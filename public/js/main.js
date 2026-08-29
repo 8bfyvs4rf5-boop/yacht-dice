@@ -64,6 +64,10 @@ let roomCode = null;
 let prevState = null;
 let diceApi = [];
 let cellRefs = { 0: {}, 1: {} };
+let chatRenderedCount = 0;
+let chatOpen = false;
+let chatUnread = 0;
+let yachtHideTimer = null;
 
 function wsUrl(room, name) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -75,6 +79,7 @@ function connect(room, name, { silent = false } = {}) {
   roomCode = room;
   myIndex = null;
   prevState = null;
+  resetChat();
   ws = new WebSocket(wsUrl(room, name));
   let helloReceived = false;
 
@@ -119,6 +124,10 @@ function leaveRoom() {
   myIndex = null;
   prevState = null;
   sessionStorage.removeItem('yatzy_session');
+  closeChat();
+  stopHeartRain();
+  $('yachtFx').classList.remove('play');
+  clearTimeout(yachtHideTimer);
   showScreen('lobby');
 }
 
@@ -230,6 +239,103 @@ function attemptScore(catKey, playerIdx) {
   send({ type: 'score', category: catKey });
 }
 
+// ------------------------------------------------------------------ chat
+
+function resetChat() {
+  chatRenderedCount = 0;
+  chatUnread = 0;
+  $('chatMessages').innerHTML = '';
+  updateChatBadge();
+  closeChat();
+}
+
+function renderChat(chat) {
+  if (!chat) return;
+  const host = $('chatMessages');
+  for (let i = chatRenderedCount; i < chat.length; i++) {
+    const m = chat[i];
+    const mine = m.idx === myIndex;
+    const el = document.createElement('div');
+    el.className = 'chat-msg ' + (mine ? 'me' : 'opp');
+    const nameEl = document.createElement('span');
+    nameEl.className = 'chat-msg-name';
+    nameEl.textContent = mine ? '나' : m.name;
+    const textEl = document.createElement('span');
+    textEl.textContent = m.text;
+    el.appendChild(nameEl);
+    el.appendChild(textEl);
+    host.appendChild(el);
+    if (!mine && !chatOpen) chatUnread++;
+  }
+  chatRenderedCount = chat.length;
+  updateChatBadge();
+  if (chatOpen) host.scrollTop = host.scrollHeight;
+}
+
+function updateChatBadge() {
+  const badge = $('chatBadge');
+  badge.textContent = chatUnread > 9 ? '9+' : String(chatUnread);
+  badge.classList.toggle('hidden', chatUnread === 0);
+}
+
+function openChat() {
+  chatOpen = true;
+  chatUnread = 0;
+  updateChatBadge();
+  $('chatPanel').classList.add('open');
+  $('chatBackdrop').classList.add('open');
+  const host = $('chatMessages');
+  host.scrollTop = host.scrollHeight;
+  setTimeout(() => $('chatInput').focus(), 150);
+}
+
+function closeChat() {
+  chatOpen = false;
+  $('chatPanel').classList.remove('open');
+  $('chatBackdrop').classList.remove('open');
+}
+
+function sendChat() {
+  const input = $('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  send({ type: 'chat', text });
+  input.value = '';
+}
+
+// ------------------------------------------------------------------ fx
+
+function stopHeartRain() {
+  $('heartRain').innerHTML = '';
+}
+
+function startHeartRain() {
+  const host = $('heartRain');
+  if (host.childElementCount) return; // already raining
+  const emojis = ['💗', '🩷', '💕'];
+  for (let i = 0; i < 26; i++) {
+    const el = document.createElement('span');
+    el.className = 'heart-drop';
+    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    el.style.left = `${Math.random() * 100}%`;
+    el.style.fontSize = `${14 + Math.random() * 18}px`;
+    el.style.animationDuration = `${3 + Math.random() * 3}s`;
+    el.style.animationDelay = `-${Math.random() * 5}s`;
+    el.style.setProperty('--drift', `${Math.round(Math.random() * 60 - 30)}px`);
+    host.appendChild(el);
+  }
+}
+
+function playYachtEffect(name) {
+  const fx = $('yachtFx');
+  $('yachtCaption').textContent = `🎉 ${name}님 요트(YACHT)!! 🎉`;
+  fx.classList.remove('play');
+  void fx.offsetWidth; // force reflow so the animation restarts on repeat yatzys
+  fx.classList.add('play');
+  clearTimeout(yachtHideTimer);
+  yachtHideTimer = setTimeout(() => fx.classList.remove('play'), 2500);
+}
+
 // ------------------------------------------------------------------ render
 
 function updateCategoryCell(catKey, playerIdx, players, turn) {
@@ -338,6 +444,14 @@ function renderState(msg) {
         toast(`${opp.name}님이 ${LABELS[c.key]}에 ${after}점 기록!`);
       }
     }
+    // yacht sail-by effect whenever either player actually lands a Yatzy (5-of-a-kind)
+    for (let idx = 0; idx < 2; idx++) {
+      const beforeYatzy = prevState.players[idx].scorecard.yatzy;
+      const afterYatzy = players[idx].scorecard.yatzy;
+      if (beforeYatzy === null && afterYatzy === 50) {
+        playYachtEffect(players[idx].name);
+      }
+    }
   }
 
   prevState = msg;
@@ -367,6 +481,7 @@ function renderState(msg) {
       $('resultTitle').innerHTML = `💔 ${opp.name}에게 참패 💔`;
       $('resultDetail').textContent = `${myName}님, ${opp.name}님에게 ${diff}점 차이로 처참하게 무너졌습니다... (${myTotal} : ${oppTotal}) 하지만 다음엔 반드시 설욕할 수 있어요!`;
     }
+    if (myTotal > oppTotal) startHeartRain(); else stopHeartRain();
     showScreen('result');
     sessionStorage.removeItem('yatzy_session');
   }
@@ -375,6 +490,7 @@ function renderState(msg) {
 function onState(msg) {
   if (!diceApi.length) buildDice();
   if (!Object.keys(cellRefs[0]).length) buildBoard();
+  renderChat(msg.chat);
   renderState(msg);
 }
 
@@ -407,6 +523,11 @@ $('menuBtn').addEventListener('click', () => {
 });
 $('restartBtn').addEventListener('click', leaveRoom);
 $('rollBtn').addEventListener('click', rollDice);
+
+$('chatBtn').addEventListener('click', () => { chatOpen ? closeChat() : openChat(); });
+$('chatCloseBtn').addEventListener('click', closeChat);
+$('chatBackdrop').addEventListener('click', closeChat);
+$('chatForm').addEventListener('submit', (e) => { e.preventDefault(); sendChat(); });
 
 // auto-rejoin after refresh
 (function init() {
