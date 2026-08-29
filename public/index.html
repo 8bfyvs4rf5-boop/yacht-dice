@@ -42,25 +42,19 @@
       <button class="icon-btn" id="backBtn" title="로비로">‹</button>
       <button class="icon-btn" id="menuBtn" title="새로고침">≡</button>
       <div class="vs-panel">
-        <div class="player-chip me">
+        <div class="player-chip me" id="p0Chip">
           <span class="avatar">🙂</span>
           <span class="pname" id="p0Name">-</span>
           <span class="pscore" id="p0Score">0</span>
         </div>
         <span class="vs">VS</span>
-        <div class="player-chip opp">
+        <div class="player-chip opp" id="p1Chip">
           <span class="pscore" id="p1Score">0</span>
           <span class="pname" id="p1Name">-</span>
           <span class="avatar">🙂</span>
         </div>
       </div>
     </header>
-
-    <div class="opp-strip" id="oppStrip">
-      <span class="opp-strip-label">상대 주사위</span>
-      <div class="opp-mini-dice" id="oppMiniDice"></div>
-      <span class="opp-rolls" id="oppRolls"></span>
-    </div>
 
     <div class="board">
       <div class="board-head">
@@ -72,13 +66,21 @@
       <div class="board-rows" id="boardRows"></div>
     </div>
 
-    <div class="dice-row" id="diceRow"></div>
+    <div class="dice-arena">
+      <div class="opp-strip" id="oppStrip">
+        <span class="opp-strip-label">상대 주사위</span>
+        <div class="opp-mini-dice" id="oppMiniDice"></div>
+        <span class="opp-rolls" id="oppRolls"></span>
+      </div>
 
-    <button id="rollBtn" class="roll-btn">
-      <span>ROLL</span>
-      <span class="roll-count" id="rollCount">3</span>
-    </button>
-    <p id="turnMsg" class="turn-msg"></p>
+      <div class="dice-row" id="diceRow"></div>
+
+      <button id="rollBtn" class="roll-btn">
+        <span>ROLL</span>
+        <span class="roll-count" id="rollCount">3</span>
+      </button>
+      <p id="turnMsg" class="turn-msg"></p>
+    </div>
   </section>
 
   <section id="result" class="screen hidden">

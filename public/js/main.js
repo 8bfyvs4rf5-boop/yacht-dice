@@ -224,14 +224,15 @@ function rollDice() { send({ type: 'roll' }); }
 function toggleHold(i) { send({ type: 'hold', index: i }); }
 function attemptScore(catKey, playerIdx) {
   if (playerIdx !== myIndex) return;
-  const me = prevState && prevState.players[myIndex];
+  if (!prevState || prevState.turn !== myIndex) return;
+  const me = prevState.players[myIndex];
   if (!me || !me.rolled || me.scorecard[catKey] !== null) return;
   send({ type: 'score', category: catKey });
 }
 
 // ------------------------------------------------------------------ render
 
-function updateCategoryCell(catKey, playerIdx, players) {
+function updateCategoryCell(catKey, playerIdx, players, turn) {
   const el = cellRefs[playerIdx][catKey];
   if (!el) return;
   const p = players[playerIdx];
@@ -243,7 +244,7 @@ function updateCategoryCell(catKey, playerIdx, players) {
     return;
   }
   const isMine = playerIdx === myIndex;
-  const canScore = isMine && p.rolled;
+  const canScore = isMine && p.rolled && turn === myIndex;
   if (canScore) {
     el.textContent = calculateScore(catKey, p.dice);
     el.classList.add('mine', 'available', 'preview');
@@ -260,7 +261,7 @@ function upperSumOf(p) {
 }
 
 function renderState(msg) {
-  const { players, status } = msg;
+  const { players, status, turn } = msg;
   if (!players[0] || !players[1]) return;
 
   $('p0Name').textContent = players[0].name;
@@ -268,10 +269,14 @@ function renderState(msg) {
   $('p0Score').textContent = players[0].total;
   $('p1Score').textContent = players[1].total;
 
-  for (const c of MINOR) { updateCategoryCell(c.key, 0, players); updateCategoryCell(c.key, 1, players); }
-  for (const c of MAJOR_TOP) { updateCategoryCell(c.key, 0, players); updateCategoryCell(c.key, 1, players); }
-  updateCategoryCell('chance', 0, players);
-  updateCategoryCell('chance', 1, players);
+  const isMyTurn = status === 'playing' && turn === myIndex;
+  $('p0Chip').classList.toggle('active', status === 'playing' && turn === 0);
+  $('p1Chip').classList.toggle('active', status === 'playing' && turn === 1);
+
+  for (const c of MINOR) { updateCategoryCell(c.key, 0, players, turn); updateCategoryCell(c.key, 1, players, turn); }
+  for (const c of MAJOR_TOP) { updateCategoryCell(c.key, 0, players, turn); updateCategoryCell(c.key, 1, players, turn); }
+  updateCategoryCell('chance', 0, players, turn);
+  updateCategoryCell('chance', 1, players, turn);
 
   $('bonusCell0').textContent = `${Math.min(upperSumOf(players[0]), UPPER_BONUS_THRESHOLD)}/${UPPER_BONUS_THRESHOLD}`;
   $('bonusCell1').textContent = `${Math.min(upperSumOf(players[1]), UPPER_BONUS_THRESHOLD)}/${UPPER_BONUS_THRESHOLD}`;
@@ -284,6 +289,7 @@ function renderState(msg) {
   me.dice.forEach((v, i) => {
     diceApi[i].setValue(v, { animate: justRolled && !me.held[i] });
     diceApi[i].setHeld(me.held[i]);
+    diceApi[i].el.classList.toggle('locked', !isMyTurn || me.finished);
   });
 
   // opponent dice strip (bigger heart-pip tiles, mirrors held state live)
@@ -304,16 +310,20 @@ function renderState(msg) {
     tile.classList.toggle('held', !!opp.held[i]);
     tile.replaceChild(buildPipGrid(v, 'mini-die-pips'), tile.firstChild);
   });
-  $('oppRolls').textContent = opp.connected ? `굴리기 ${opp.rollsLeft}회 남음` : '연결 끊김';
+  if (!opp.connected) $('oppRolls').textContent = '연결 끊김';
+  else if (isMyTurn) $('oppRolls').textContent = '대기 중';
+  else $('oppRolls').textContent = `굴리는 중… (${opp.rollsLeft}회 남음)`;
+  $('oppStrip').classList.toggle('active-turn', status === 'playing' && !isMyTurn);
 
   $('rollCount').textContent = me.rollsLeft;
-  const canRoll = status === 'playing' && me.rollsLeft > 0 && !me.finished;
+  const canRoll = isMyTurn && me.rollsLeft > 0 && !me.finished;
   $('rollBtn').disabled = !canRoll;
 
   let msgText = '';
   if (status === 'waiting') msgText = '상대방을 기다리는 중…';
   else if (status === 'finished') msgText = '게임 종료!';
   else if (me.finished) msgText = '모든 칸을 채웠어요. 상대방을 기다리는 중…';
+  else if (!isMyTurn) msgText = `${opp.name}님의 차례입니다. 잠시만 기다려주세요…`;
   else if (!me.rolled) msgText = 'ROLL을 눌러 시작하세요';
   else msgText = `점수를 선택하거나 다시 굴리세요 (남은 굴리기 ${me.rollsLeft}회)`;
   $('turnMsg').textContent = msgText;

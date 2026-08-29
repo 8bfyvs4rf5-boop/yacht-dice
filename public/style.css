@@ -182,18 +182,36 @@ body::after { bottom: 10%; right: 8%; font-size: 46px; animation-delay: 2.5s; }
   padding: 2px 8px; font-weight: 800; font-size: 14px; min-width: 22px; text-align: center;
 }
 .vs-panel .vs { color: var(--gold-1); font-weight: 900; font-size: 13px; }
+.player-chip { border-radius: 999px; padding: 3px 6px; transition: background .2s ease; }
+.player-chip.active { background: rgba(255,255,255,.18); }
 .player-chip.me.active .pname, .player-chip.opp.active .pname { color: var(--gold-1); }
+
+/* Unified dice-rolling panel: opponent's live dice, my dice, and the roll
+   button all live in one card so both sides are visible at a glance without
+   hunting elsewhere on the screen. */
+.dice-arena {
+  margin: 0 10px 12px;
+  padding: 12px 10px 14px;
+  background: rgba(255,255,255,.10);
+  border-radius: 20px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+}
 
 .opp-strip {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 14px 12px;
+  margin: 0 4px 14px;
   padding: 10px 12px;
   background: rgba(255,255,255,.14);
   border-radius: 14px;
   color: var(--white);
   font-size: 12px;
+  transition: box-shadow .2s ease, background .2s ease;
+}
+.opp-strip.active-turn {
+  background: rgba(255,255,255,.22);
+  box-shadow: inset 0 0 0 2px var(--gold-1);
 }
 .opp-strip-label { opacity: .85; white-space: nowrap; font-weight: 700; }
 .opp-mini-dice { display: flex; gap: 6px; flex: 1; justify-content: center; }
@@ -287,7 +305,7 @@ body::after { bottom: 10%; right: 8%; font-size: 46px; animation-delay: 2.5s; }
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin: 14px 0;
+  margin: 0 0 14px;
   padding: 0 10px;
 }
 
@@ -346,7 +364,7 @@ body::after { bottom: 10%; right: 8%; font-size: 46px; animation-delay: 2.5s; }
 .die-scene.locked { pointer-events: none; opacity: .55; }
 
 .roll-btn {
-  margin: 0 14px;
+  margin: 0 4px;
   padding: 16px;
   border: none;
   border-radius: 18px;

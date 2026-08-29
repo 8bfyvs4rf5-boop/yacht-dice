@@ -29,7 +29,8 @@ export class GameRoom {
 
   async loadGame() {
     if (!this.game) {
-      this.game = (await this.state.storage.get('game')) || { code: null, players: [] };
+      this.game = (await this.state.storage.get('game')) || { code: null, players: [], turn: 0 };
+      if (this.game.turn == null) this.game.turn = 0;
     }
     return this.game;
   }
@@ -120,6 +121,7 @@ export class GameRoom {
 
     if (msg.type === 'roll') {
       if (status !== 'playing') return;
+      if (game.turn !== session.index) return;
       if (player.rollsLeft <= 0) return;
       for (let i = 0; i < 5; i++) {
         if (!player.held[i]) player.dice[i] = rollDie();
@@ -128,12 +130,14 @@ export class GameRoom {
       player.rolled = true;
     } else if (msg.type === 'hold') {
       if (status !== 'playing') return;
+      if (game.turn !== session.index) return;
       if (!player.rolled) return;
       const idx = msg.index;
       if (typeof idx !== 'number' || idx < 0 || idx > 4) return;
       player.held[idx] = !player.held[idx];
     } else if (msg.type === 'score') {
       if (status !== 'playing') return;
+      if (game.turn !== session.index) return;
       if (!player.rolled) return;
       const cat = CATEGORIES.find((c) => c.key === msg.category);
       if (!cat) return;
@@ -143,6 +147,7 @@ export class GameRoom {
       player.held = [false, false, false, false, false];
       player.rollsLeft = 3;
       player.rolled = false;
+      game.turn = 1 - game.turn;
     } else {
       return;
     }
@@ -168,7 +173,7 @@ export class GameRoom {
         ...summary,
       };
     });
-    const payload = JSON.stringify({ type: 'state', room: game.code, status, players });
+    const payload = JSON.stringify({ type: 'state', room: game.code, status, turn: game.turn, players });
     for (const ws of this.sessions.keys()) {
       try { ws.send(payload); } catch { /* dead socket, will be cleaned up on close */ }
     }
