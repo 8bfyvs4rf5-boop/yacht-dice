@@ -32,6 +32,7 @@ export class GameRoom {
       this.game = (await this.state.storage.get('game')) || { code: null, players: [], turn: 0 };
       if (this.game.turn == null) this.game.turn = 0;
       if (!this.game.chat) this.game.chat = [];
+      if (this.game.pendingExtraRoll === undefined) this.game.pendingExtraRoll = null;
     }
     return this.game;
   }
@@ -149,11 +150,27 @@ export class GameRoom {
       player.rollsLeft = 3;
       player.rolled = false;
       game.turn = 1 - game.turn;
+      if (game.pendingExtraRoll && game.pendingExtraRoll.by === session.index) game.pendingExtraRoll = null;
     } else if (msg.type === 'chat') {
       const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, 200) : '';
       if (!text) return;
       game.chat.push({ idx: session.index, name: player.name, text, ts: Date.now() });
       if (game.chat.length > 100) game.chat = game.chat.slice(-100);
+    } else if (msg.type === 'extraRollRequest') {
+      // mutual-consent extra roll: only the player on turn, once their
+      // normal 3 rolls are used up, and only one outstanding request at a time
+      if (status !== 'playing') return;
+      if (game.turn !== session.index) return;
+      if (player.rollsLeft > 0) return;
+      if (game.pendingExtraRoll) return;
+      game.pendingExtraRoll = { by: session.index };
+    } else if (msg.type === 'extraRollRespond') {
+      if (status !== 'playing') return;
+      if (!game.pendingExtraRoll) return;
+      if (game.pendingExtraRoll.by === session.index) return; // only the other player may respond
+      const requester = game.players[game.pendingExtraRoll.by];
+      if (msg.approve && requester) requester.rollsLeft += 1;
+      game.pendingExtraRoll = null;
     } else {
       return;
     }
@@ -179,7 +196,15 @@ export class GameRoom {
         ...summary,
       };
     });
-    const payload = JSON.stringify({ type: 'state', room: game.code, status, turn: game.turn, chat: game.chat, players });
+    const payload = JSON.stringify({
+      type: 'state',
+      room: game.code,
+      status,
+      turn: game.turn,
+      chat: game.chat,
+      pendingExtraRoll: game.pendingExtraRoll,
+      players,
+    });
     for (const ws of this.sessions.keys()) {
       try { ws.send(payload); } catch { /* dead socket, will be cleaned up on close */ }
     }

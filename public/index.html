@@ -78,10 +78,15 @@
 
       <div class="dice-row" id="diceRow"></div>
 
-      <button id="rollBtn" class="roll-btn">
-        <span>ROLL</span>
-        <span class="roll-count" id="rollCount">3</span>
-      </button>
+      <div class="roll-row">
+        <button id="rollBtn" class="roll-btn">
+          <span>ROLL</span>
+          <span class="roll-count" id="rollCount">3</span>
+        </button>
+        <button id="extraRollBtn" class="extra-roll-btn" title="상대방에게 동의를 구하고 한 번 더 굴리기">
+          <span id="extraRollBtnText">🙏 +1 요청</span>
+        </button>
+      </div>
       <p id="turnMsg" class="turn-msg"></p>
     </div>
   </section>
@@ -100,6 +105,16 @@
   <div class="achieve-fx" id="achieveFx">
     <div class="achieve-icon" id="achieveIcon"></div>
     <div class="achieve-caption" id="achieveCaption"></div>
+  </div>
+
+  <div class="consent-backdrop" id="consentBackdrop"></div>
+  <div class="consent-modal" id="consentModal">
+    <p class="consent-icon">🙏🎲</p>
+    <p class="consent-text" id="consentText"></p>
+    <div class="consent-actions">
+      <button id="consentDeclineBtn" class="primary-btn ghost">거절</button>
+      <button id="consentAcceptBtn" class="primary-btn">동의</button>
+    </div>
   </div>
 
   <div class="chat-backdrop" id="chatBackdrop"></div>

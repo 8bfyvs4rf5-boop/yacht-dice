@@ -129,6 +129,8 @@ function leaveRoom() {
   stopHeartRain();
   $('achieveFx').classList.remove('play');
   clearTimeout(achieveHideTimer);
+  $('consentModal').classList.remove('open');
+  $('consentBackdrop').classList.remove('open');
   showScreen('lobby');
 }
 
@@ -235,10 +237,14 @@ function toggleHold(i) { send({ type: 'hold', index: i }); }
 function attemptScore(catKey, playerIdx) {
   if (playerIdx !== myIndex) return;
   if (!prevState || prevState.turn !== myIndex) return;
+  if (prevState.pendingExtraRoll && prevState.pendingExtraRoll.by === myIndex) return;
   const me = prevState.players[myIndex];
   if (!me || !me.rolled || me.scorecard[catKey] !== null) return;
   send({ type: 'score', category: catKey });
 }
+
+function requestExtraRoll() { send({ type: 'extraRollRequest' }); }
+function respondExtraRoll(approve) { send({ type: 'extraRollRespond', approve }); }
 
 // ------------------------------------------------------------------ chat
 
@@ -384,7 +390,7 @@ function upperSumOf(p) {
 }
 
 function renderState(msg) {
-  const { players, status, turn } = msg;
+  const { players, status, turn, pendingExtraRoll } = msg;
   if (!players[0] || !players[1]) return;
 
   $('p0Name').textContent = players[0].name;
@@ -431,11 +437,29 @@ function renderState(msg) {
   const canRoll = isMyTurn && me.rollsLeft > 0 && !me.finished;
   $('rollBtn').disabled = !canRoll;
 
+  // mutual-consent extra roll: request button on the roller's side, a
+  // consent modal on the other side
+  const myPendingRequest = !!(pendingExtraRoll && pendingExtraRoll.by === myIndex);
+  const oppPendingRequest = !!(pendingExtraRoll && pendingExtraRoll.by === oppIdx);
+  const canRequestExtra = isMyTurn && me.rollsLeft === 0 && !me.finished && !pendingExtraRoll;
+  const extraBtn = $('extraRollBtn');
+  extraBtn.disabled = !canRequestExtra;
+  extraBtn.classList.toggle('pending', myPendingRequest);
+  $('extraRollBtnText').textContent = myPendingRequest ? '⏳ 응답 대기 중' : '🙏 +1 요청';
+
+  const consentOpen = status === 'playing' && oppPendingRequest;
+  $('consentModal').classList.toggle('open', consentOpen);
+  $('consentBackdrop').classList.toggle('open', consentOpen);
+  if (consentOpen) {
+    $('consentText').textContent = `${players[pendingExtraRoll.by].name}님이 주사위를 한 번 더 굴리고 싶어해요. 허락할까요?`;
+  }
+
   let msgText = '';
   if (status === 'waiting') msgText = '상대방을 기다리는 중…';
   else if (status === 'finished') msgText = '게임 종료!';
   else if (me.finished) msgText = '모든 칸을 채웠어요. 상대방을 기다리는 중…';
   else if (!isMyTurn) msgText = `${opp.name}님의 차례입니다. 잠시만 기다려주세요…`;
+  else if (myPendingRequest) msgText = '상대방에게 추가 굴리기를 요청했어요. 응답을 기다리는 중…';
   else if (!me.rolled) msgText = 'ROLL을 눌러 시작하세요';
   else msgText = `점수를 선택하거나 다시 굴리세요 (남은 굴리기 ${me.rollsLeft}회)`;
   $('turnMsg').textContent = msgText;
@@ -531,6 +555,9 @@ $('menuBtn').addEventListener('click', () => {
 });
 $('restartBtn').addEventListener('click', leaveRoom);
 $('rollBtn').addEventListener('click', rollDice);
+$('extraRollBtn').addEventListener('click', requestExtraRoll);
+$('consentAcceptBtn').addEventListener('click', () => respondExtraRoll(true));
+$('consentDeclineBtn').addEventListener('click', () => respondExtraRoll(false));
 
 $('chatBtn').addEventListener('click', () => { chatOpen ? closeChat() : openChat(); });
 $('chatCloseBtn').addEventListener('click', closeChat);
