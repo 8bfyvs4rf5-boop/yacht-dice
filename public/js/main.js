@@ -67,6 +67,7 @@ let cellRefs = { 0: {}, 1: {} };
 let chatRenderedCount = 0;
 let chatOpen = false;
 let chatUnread = 0;
+let chatFirstRender = true; // avoid a toast storm when catching up on reconnect
 let achieveHideTimer = null;
 
 function wsUrl(room, name) {
@@ -244,6 +245,7 @@ function attemptScore(catKey, playerIdx) {
 function resetChat() {
   chatRenderedCount = 0;
   chatUnread = 0;
+  chatFirstRender = true;
   $('chatMessages').innerHTML = '';
   updateChatBadge();
   closeChat();
@@ -252,6 +254,7 @@ function resetChat() {
 function renderChat(chat) {
   if (!chat) return;
   const host = $('chatMessages');
+  const isCatchUp = chatFirstRender; // don't toast-storm old history on (re)join
   for (let i = chatRenderedCount; i < chat.length; i++) {
     const m = chat[i];
     const mine = m.idx === myIndex;
@@ -265,9 +268,13 @@ function renderChat(chat) {
     el.appendChild(nameEl);
     el.appendChild(textEl);
     host.appendChild(el);
-    if (!mine && !chatOpen) chatUnread++;
+    if (!mine) {
+      if (!chatOpen) chatUnread++;
+      if (!isCatchUp) toast(`💬 ${m.name}: ${m.text}`);
+    }
   }
   chatRenderedCount = chat.length;
+  chatFirstRender = false;
   updateChatBadge();
   if (chatOpen) host.scrollTop = host.scrollHeight;
 }
