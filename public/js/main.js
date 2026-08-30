@@ -445,7 +445,10 @@ function renderState(msg) {
   const extraBtn = $('extraRollBtn');
   extraBtn.disabled = !canRequestExtra;
   extraBtn.classList.toggle('pending', myPendingRequest);
-  $('extraRollBtnText').textContent = myPendingRequest ? '⏳ 응답 대기 중' : '🙏 +1 요청';
+  let extraLabel = '🙏 +1 요청';
+  if (myPendingRequest) extraLabel = '⏳ 응답 대기 중';
+  else if (isMyTurn && !me.finished && me.rollsLeft > 0) extraLabel = '🙏 +1 요청\n(다 굴린 후)';
+  $('extraRollBtnText').textContent = extraLabel;
 
   const consentOpen = status === 'playing' && oppPendingRequest;
   $('consentModal').classList.toggle('open', consentOpen);
