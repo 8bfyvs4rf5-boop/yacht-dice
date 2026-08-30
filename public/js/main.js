@@ -67,7 +67,7 @@ let cellRefs = { 0: {}, 1: {} };
 let chatRenderedCount = 0;
 let chatOpen = false;
 let chatUnread = 0;
-let yachtHideTimer = null;
+let achieveHideTimer = null;
 
 function wsUrl(room, name) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -126,8 +126,8 @@ function leaveRoom() {
   sessionStorage.removeItem('yatzy_session');
   closeChat();
   stopHeartRain();
-  $('yachtFx').classList.remove('play');
-  clearTimeout(yachtHideTimer);
+  $('achieveFx').classList.remove('play');
+  clearTimeout(achieveHideTimer);
   showScreen('lobby');
 }
 
@@ -326,14 +326,24 @@ function startHeartRain() {
   }
 }
 
-function playYachtEffect(name) {
-  const fx = $('yachtFx');
-  $('yachtCaption').textContent = `🎉 ${name}님 요트(YACHT)!! 🎉`;
-  fx.classList.remove('play');
-  void fx.offsetWidth; // force reflow so the animation restarts on repeat yatzys
+const ACHIEVEMENTS = {
+  yatzy: { icon: '⛵', label: '요트(YACHT)', cls: 'type-yatzy', duration: 2700 },
+  smallStraight: { icon: '🔥', label: '스몰 스트레이트', cls: 'type-small', duration: 2100 },
+  largeStraight: { icon: '🌈', label: '라지 스트레이트', cls: 'type-large', duration: 2500 },
+  fullHouse: { icon: '🏠', label: '풀하우스', cls: 'type-house', duration: 2500 },
+};
+
+function playAchieveEffect(catKey, name) {
+  const conf = ACHIEVEMENTS[catKey];
+  if (!conf) return;
+  const fx = $('achieveFx');
+  $('achieveIcon').textContent = conf.icon;
+  $('achieveCaption').textContent = `🎉 ${name}님 ${conf.label}!! 🎉`;
+  fx.className = 'achieve-fx ' + conf.cls;
+  void fx.offsetWidth; // force reflow so the animation restarts on back-to-back achievements
   fx.classList.add('play');
-  clearTimeout(yachtHideTimer);
-  yachtHideTimer = setTimeout(() => fx.classList.remove('play'), 2500);
+  clearTimeout(achieveHideTimer);
+  achieveHideTimer = setTimeout(() => fx.classList.remove('play'), conf.duration);
 }
 
 // ------------------------------------------------------------------ render
@@ -388,38 +398,27 @@ function renderState(msg) {
   $('bonusCell1').textContent = `${Math.min(upperSumOf(players[1]), UPPER_BONUS_THRESHOLD)}/${UPPER_BONUS_THRESHOLD}`;
 
   const me = players[myIndex];
-  // A roll actually happened iff rollsLeft just went down (per-die value
-  // comparison is wrong: a die that happens to re-land on its old value
-  // would silently skip its spin animation).
-  const justRolled = !!(prevState && prevState.players[myIndex] && prevState.players[myIndex].rollsLeft > me.rollsLeft);
-  me.dice.forEach((v, i) => {
-    diceApi[i].setValue(v, { animate: justRolled && !me.held[i] });
-    diceApi[i].setHeld(me.held[i]);
-    diceApi[i].el.classList.toggle('locked', !isMyTurn || me.finished);
-  });
-
-  // opponent dice strip (bigger heart-pip tiles, mirrors held state live)
   const oppIdx = myIndex === 0 ? 1 : 0;
   const opp = players[oppIdx];
-  const mini = $('oppMiniDice');
-  if (mini.childElementCount !== 5) {
-    mini.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
-      const d = document.createElement('div');
-      d.className = 'mini-die';
-      d.appendChild(buildPipGrid(1, 'mini-die-pips'));
-      mini.appendChild(d);
-    }
-  }
-  opp.dice.forEach((v, i) => {
-    const tile = mini.children[i];
-    tile.classList.toggle('held', !!opp.held[i]);
-    tile.replaceChild(buildPipGrid(v, 'mini-die-pips'), tile.firstChild);
+
+  // Unified dice display: the single 3D dice row always shows whichever
+  // player currently has the turn, roll animation included, so I watch my
+  // opponent's roll live in the same place I roll my own (and vice versa)
+  // instead of a separate mini-dice strip.
+  const active = players[turn];
+  const prevActive = prevState && prevState.turn === turn ? prevState.players[turn] : null;
+  const justRolled = !!(prevActive && prevActive.rollsLeft > active.rollsLeft);
+  active.dice.forEach((v, i) => {
+    diceApi[i].setValue(v, { animate: justRolled && !active.held[i] });
+    diceApi[i].setHeld(active.held[i]);
+    diceApi[i].el.classList.toggle('readonly', !isMyTurn);
   });
-  if (!opp.connected) $('oppRolls').textContent = '연결 끊김';
-  else if (isMyTurn) $('oppRolls').textContent = '대기 중';
-  else $('oppRolls').textContent = `굴리는 중… (${opp.rollsLeft}회 남음)`;
-  $('oppStrip').classList.toggle('active-turn', status === 'playing' && !isMyTurn);
+
+  $('diceStatusName').textContent = isMyTurn ? '내 차례' : `${active.name}님 차례`;
+  $('diceStatusRolls').textContent = !active.connected
+    ? '연결 끊김'
+    : `굴리기 ${active.rollsLeft}/3 남음`;
+  $('diceStatus').classList.toggle('my-turn', isMyTurn);
 
   $('rollCount').textContent = me.rollsLeft;
   const canRoll = isMyTurn && me.rollsLeft > 0 && !me.finished;
@@ -444,12 +443,14 @@ function renderState(msg) {
         toast(`${opp.name}님이 ${LABELS[c.key]}에 ${after}점 기록!`);
       }
     }
-    // yacht sail-by effect whenever either player actually lands a Yatzy (5-of-a-kind)
+    // full-screen effect whenever either player actually lands a tracked achievement
     for (let idx = 0; idx < 2; idx++) {
-      const beforeYatzy = prevState.players[idx].scorecard.yatzy;
-      const afterYatzy = players[idx].scorecard.yatzy;
-      if (beforeYatzy === null && afterYatzy === 50) {
-        playYachtEffect(players[idx].name);
+      for (const key of Object.keys(ACHIEVEMENTS)) {
+        const before = prevState.players[idx].scorecard[key];
+        const after = players[idx].scorecard[key];
+        if (before === null && after) {
+          playAchieveEffect(key, players[idx].name);
+        }
       }
     }
   }
