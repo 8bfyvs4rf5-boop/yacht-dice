@@ -69,18 +69,26 @@ let chatOpen = false;
 let chatUnread = 0;
 let chatFirstRender = true; // avoid a toast storm when catching up on reconnect
 let achieveHideTimer = null;
+let intentionalDisconnect = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
 
 function wsUrl(room, name) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${location.host}/ws?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}&pid=${encodeURIComponent(pid())}`;
 }
 
-function connect(room, name, { silent = false } = {}) {
+function connect(room, name, { silent = false, isReconnect = false } = {}) {
   if (ws) { try { ws.close(); } catch {} }
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  intentionalDisconnect = false;
   roomCode = room;
-  myIndex = null;
-  prevState = null;
-  resetChat();
+  if (!isReconnect) {
+    myIndex = null;
+    prevState = null;
+    resetChat();
+  }
   ws = new WebSocket(wsUrl(room, name));
   let helloReceived = false;
 
@@ -95,6 +103,7 @@ function connect(room, name, { silent = false } = {}) {
     const msg = JSON.parse(evt.data);
     if (msg.type === 'hello') {
       helloReceived = true;
+      reconnectAttempts = 0;
       clearTimeout(failTimer);
       myIndex = msg.you;
       sessionStorage.setItem('yatzy_session', JSON.stringify({ room, name }));
@@ -106,9 +115,27 @@ function connect(room, name, { silent = false } = {}) {
   });
   ws.addEventListener('close', () => {
     clearTimeout(failTimer);
-    if (!helloReceived) onConnectFailed(silent);
+    if (!helloReceived) {
+      onConnectFailed(silent);
+      return;
+    }
+    // The socket died mid-session (mobile tab backgrounded, brief network
+    // drop, etc). Reconnect automatically instead of leaving the room stuck
+    // showing the other player as permanently disconnected.
+    if (!intentionalDisconnect) scheduleReconnect(room, name);
   });
   ws.addEventListener('error', () => {});
+}
+
+function scheduleReconnect(room, name) {
+  if (reconnectTimer) return;
+  reconnectAttempts += 1;
+  const delay = Math.min(1000 * 2 ** (reconnectAttempts - 1), 8000);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (intentionalDisconnect) return;
+    connect(room, name, { silent: true, isReconnect: true });
+  }, delay);
 }
 
 function onConnectFailed(silent) {
@@ -120,6 +147,9 @@ function onConnectFailed(silent) {
 }
 
 function leaveRoom() {
+  intentionalDisconnect = true;
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
   if (ws) { try { ws.close(); } catch {} }
   ws = null;
   myIndex = null;
@@ -566,6 +596,25 @@ $('chatBtn').addEventListener('click', () => { chatOpen ? closeChat() : openChat
 $('chatCloseBtn').addEventListener('click', closeChat);
 $('chatBackdrop').addEventListener('click', closeChat);
 $('chatForm').addEventListener('submit', (e) => { e.preventDefault(); sendChat(); });
+
+// If a tab was backgrounded (mobile OS suspending the page to, say, send
+// the invite code over a messenger app) the WebSocket can die silently.
+// Nudge a reconnect as soon as the tab/network comes back, instead of
+// waiting on the close event that may never fire while suspended.
+function reconnectIfStale() {
+  if (intentionalDisconnect || !roomCode) return;
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  const raw = sessionStorage.getItem('yatzy_session');
+  if (!raw) return;
+  try {
+    const { room, name } = JSON.parse(raw);
+    connect(room, name, { silent: true, isReconnect: true });
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') reconnectIfStale();
+});
+window.addEventListener('online', reconnectIfStale);
 
 // auto-rejoin after refresh
 (function init() {
